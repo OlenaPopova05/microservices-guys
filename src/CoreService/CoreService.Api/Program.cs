@@ -3,6 +3,7 @@ using CoreService.Application.Handlers;
 using CoreService.Application.Interfaces;
 using CoreService.Infrastructure;
 using Microsoft.EntityFrameworkCore;
+using MassTransit;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -22,6 +23,18 @@ builder.Services.AddHttpClient<IUsersServiceClient, UsersServiceClient>(client =
 {
     client.BaseAddress = new Uri(builder.Configuration["UsersService:BaseUrl"]!);
     client.Timeout = TimeSpan.FromSeconds(3);
+});
+
+builder.Services.AddMassTransit(x =>
+{
+    x.UsingRabbitMq((context, cfg) =>
+    {
+        cfg.Host(builder.Configuration["RabbitMq:Host"], "/", h =>
+        {
+            h.Username(builder.Configuration["RabbitMq:Username"]!);
+            h.Password(builder.Configuration["RabbitMq:Password"]!);
+        });
+    });
 });
 
 var app = builder.Build();
