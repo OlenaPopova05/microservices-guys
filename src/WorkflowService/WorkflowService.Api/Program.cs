@@ -1,4 +1,6 @@
 using WorkflowService.Api.Middleware;
+using WorkflowService.Api.Requests;
+using WorkflowService.Application.Commands;
 using WorkflowService.Application.Handlers;
 using WorkflowService.Application.Interfaces;
 using WorkflowService.Infrastructure.Clients;
@@ -13,6 +15,11 @@ builder.Services.AddControllers()
     {
         options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
     });
+
+builder.Services.ConfigureHttpJsonOptions(options =>
+{
+    options.SerializerOptions.Converters.Add(new JsonStringEnumConverter());
+});
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
