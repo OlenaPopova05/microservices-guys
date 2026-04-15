@@ -15,15 +15,18 @@ public class HabitsController : ControllerBase
     private readonly CreateHabitHandler _createHabitHandler;
     private readonly GetHabitByIdHandler _getHabitByIdHandler;
     private readonly UpdateHabitStatusHandler _updateHabitStatusHandler;
+    private readonly DeleteHabitHandler _deleteHabitHandler;
 
     public HabitsController(
         CreateHabitHandler createHabitHandler,
         GetHabitByIdHandler getHabitByIdHandler,
-        UpdateHabitStatusHandler updateHabitStatusHandler)
+        UpdateHabitStatusHandler updateHabitStatusHandler,
+        DeleteHabitHandler deleteHabitHandler)
     {
         _createHabitHandler = createHabitHandler;
         _getHabitByIdHandler = getHabitByIdHandler;
         _updateHabitStatusHandler = updateHabitStatusHandler;
+        _deleteHabitHandler = deleteHabitHandler;
     }
 
     [HttpPost]
@@ -51,5 +54,13 @@ public class HabitsController : ControllerBase
         var command = new UpdateHabitStatusCommand(id, status);
         var result = await _updateHabitStatusHandler.Handle(command);
         return Ok(result);
+    }
+
+    [HttpDelete("{id:guid}")]
+    public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
+    {
+        var command = new DeleteHabitCommand(id);
+        await _deleteHabitHandler.Handle(command, cancellationToken);
+        return NoContent();
     }
 }

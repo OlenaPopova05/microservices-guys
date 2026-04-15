@@ -18,6 +18,7 @@ builder.Services.AddScoped<IHabitRepository, HabitRepository>();
 builder.Services.AddScoped<CreateHabitHandler>();
 builder.Services.AddScoped<GetHabitByIdHandler>();
 builder.Services.AddScoped<UpdateHabitStatusHandler>();
+builder.Services.AddScoped<DeleteHabitHandler>();
 
 builder.Services.AddHttpClient<IUsersServiceClient, UsersServiceClient>(client =>
 {
