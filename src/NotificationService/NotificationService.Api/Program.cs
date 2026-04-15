@@ -1,4 +1,5 @@
 using MassTransit;
+using NotificationService.Api.Middleware;
 using Microsoft.EntityFrameworkCore;
 using NotificationService.Api;
 using NotificationService.Infrastructure;
@@ -41,5 +42,7 @@ using (var scope = app.Services.CreateScope())
     var dbContext = scope.ServiceProvider.GetRequiredService<NotificationsDbContext>();
     await dbContext.Database.MigrateAsync();
 }
+
+app.UseMiddleware<CorrelationIdMiddleware>();
 
 app.Run();
