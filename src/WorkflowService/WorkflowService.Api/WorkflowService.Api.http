@@ -1,0 +1,29 @@
+@host = http://localhost:5030
+
+### Health
+GET {{host}}/health
+
+### Start saga: create habit (happy path)
+POST {{host}}/workflows/create-habit
+Content-Type: application/json
+
+{
+  "ownerUserId": "00000000-0000-0000-0000-000000000001",
+  "title": "Morning run",
+  "description": "5km",
+  "forceStep3Failure": false
+}
+
+### Start saga: force step-3 failure - compensation deletes habit
+POST {{host}}/workflows/create-habit
+Content-Type: application/json
+
+{
+  "ownerUserId": "00000000-0000-0000-0000-000000000001",
+  "title": "Evening stretch",
+  "description": null,
+  "forceStep3Failure": true
+}
+
+### Get workflow status (replace id)
+GET {{host}}/workflows/00000000-0000-0000-0000-000000000000

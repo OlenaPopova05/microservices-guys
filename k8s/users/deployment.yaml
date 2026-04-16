@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: users-service
+spec: # desired state
+  replicas: 1
+  selector: 
+    matchLabels:
+      app: users-service # deployment will manage pods with this label
+  template:  # pod's template
+    metadata:
+      labels:
+        app: users-service
+    spec:
+      containers:
+        - name: users-service
+          image: users-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+          # pass environment variables into container
+          env:
+            - name: ASPNETCORE_URLS
+              valueFrom:
+                configMapKeyRef:
+                  name: users-service-config
+                  key: ASPNETCORE_URLS
+            - name: ConnectionStrings__UsersDb
+              valueFrom:
+                secretKeyRef:
+                  name: users-service-secret
+                  key: ConnectionStrings__UsersDb
+                  
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            failureThreshold: 30
+            periodSeconds: 5
+
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            periodSeconds: 5
+
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            periodSeconds: 10
+
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "250m"
+              memory: "256Mi"
