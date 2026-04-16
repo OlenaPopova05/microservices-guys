@@ -11,7 +11,7 @@ builder.Services.AddDbContext<NotificationsDbContext>(options =>
 
 builder.Services.AddMassTransit(x =>
 {
-    x.AddConsumer<HabitCreatedConsumer>();
+    x.AddConsumer<HabitCreatedConsumer>(); // register consumer
 
     x.UsingRabbitMq((context, cfg) =>
     {
@@ -20,10 +20,10 @@ builder.Services.AddMassTransit(x =>
             h.Username(builder.Configuration["RabbitMQ:Username"] ?? "guest");
             h.Password(builder.Configuration["RabbitMQ:Password"] ?? "guest");
         });
-
+        // queue is created with the name notification-habit-created
         cfg.ReceiveEndpoint("notification-habit-created", e =>
         {
-            e.ConfigureConsumer<HabitCreatedConsumer>(context);
+            e.ConfigureConsumer<HabitCreatedConsumer>(context); // bind events to the queue
         });
     });
 });
@@ -43,6 +43,7 @@ using (var scope = app.Services.CreateScope())
     await dbContext.Database.MigrateAsync();
 }
 
+app.MapGet("/health", () => Results.Ok("Healthy"));
 app.UseMiddleware<CorrelationIdMiddleware>();
 
 app.Run();
