@@ -1,4 +1,5 @@
 using WorkflowService.Api.Middleware;
+using WorkflowService.Api.Options;
 using WorkflowService.Api.Requests;
 using WorkflowService.Application.Commands;
 using WorkflowService.Application.Handlers;
@@ -6,6 +7,9 @@ using WorkflowService.Application.Interfaces;
 using WorkflowService.Infrastructure.Clients;
 using WorkflowService.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Http.Resilience;
+using Microsoft.Extensions.Options;
 using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -31,17 +35,41 @@ builder.Services.AddScoped<IWorkflowRepository, WorkflowRepository>();
 builder.Services.AddScoped<StartWorkflowHandler>();
 builder.Services.AddScoped<GetWorkflowByIdHandler>();
 
-builder.Services.AddHttpClient<IUsersServiceClient, UsersServiceClient>(client =>
-{
-    client.BaseAddress = new Uri(builder.Configuration["UsersService:BaseUrl"]!);
-    client.Timeout = TimeSpan.FromSeconds(10);
-});
+builder.Services.Configure<RemoteServiceEndpointOptions>("Users", builder.Configuration.GetSection("UsersService"));
+builder.Services.Configure<RemoteServiceEndpointOptions>("Core", builder.Configuration.GetSection("CoreService"));
 
-builder.Services.AddHttpClient<ICoreServiceClient, CoreServiceClient>(client =>
-{
-    client.BaseAddress = new Uri(builder.Configuration["CoreService:BaseUrl"]!);
-    client.Timeout = TimeSpan.FromSeconds(10);
-});
+var usersDownstreamResilience = builder.Configuration.GetSection("UsersService").Get<RemoteServiceEndpointOptions>()?.Resilience
+    ?? new HttpResilienceOptions();
+var coreDownstreamResilience = builder.Configuration.GetSection("CoreService").Get<RemoteServiceEndpointOptions>()?.Resilience
+    ?? new HttpResilienceOptions();
+
+builder.Services.AddHttpClient<IUsersServiceClient, UsersServiceClient>()
+    .ConfigureHttpClient((sp, client) =>
+    {
+        var options = sp.GetRequiredService<IOptionsMonitor<RemoteServiceEndpointOptions>>().Get("Users");
+        client.BaseAddress = new Uri(options.BaseUrl);
+        client.Timeout = Timeout.InfiniteTimeSpan;
+    })
+    .AddStandardResilienceHandler(options =>
+    {
+        options.Retry.MaxRetryAttempts = usersDownstreamResilience.MaxRetryAttempts;
+        options.AttemptTimeout.Timeout = TimeSpan.FromSeconds(usersDownstreamResilience.AttemptTimeoutSeconds);
+        options.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(usersDownstreamResilience.TotalRequestTimeoutSeconds);
+    });
+
+builder.Services.AddHttpClient<ICoreServiceClient, CoreServiceClient>()
+    .ConfigureHttpClient((sp, client) =>
+    {
+        var options = sp.GetRequiredService<IOptionsMonitor<RemoteServiceEndpointOptions>>().Get("Core");
+        client.BaseAddress = new Uri(options.BaseUrl);
+        client.Timeout = Timeout.InfiniteTimeSpan;
+    })
+    .AddStandardResilienceHandler(options =>
+    {
+        options.Retry.MaxRetryAttempts = coreDownstreamResilience.MaxRetryAttempts;
+        options.AttemptTimeout.Timeout = TimeSpan.FromSeconds(coreDownstreamResilience.AttemptTimeoutSeconds);
+        options.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(coreDownstreamResilience.TotalRequestTimeoutSeconds);
+    });
 
 var app = builder.Build();
 

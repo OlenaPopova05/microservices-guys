@@ -1,8 +1,12 @@
 using CoreService.Api.Middleware;
+using CoreService.Api.Options;
 using CoreService.Application.Handlers;
 using CoreService.Application.Interfaces;
 using CoreService.Infrastructure;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Http.Resilience;
+using Microsoft.Extensions.Options;
 using MassTransit;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -20,11 +24,24 @@ builder.Services.AddScoped<GetHabitByIdHandler>();
 builder.Services.AddScoped<UpdateHabitStatusHandler>();
 builder.Services.AddScoped<DeleteHabitHandler>();
 
-builder.Services.AddHttpClient<IUsersServiceClient, UsersServiceClient>(client =>
-{
-    client.BaseAddress = new Uri(builder.Configuration["UsersService:BaseUrl"]!);
-    client.Timeout = TimeSpan.FromSeconds(3);
-});
+builder.Services.Configure<UsersServiceOptions>(builder.Configuration.GetSection("UsersService"));
+
+var usersServiceResilience = builder.Configuration.GetSection("UsersService").Get<UsersServiceOptions>()?.Resilience
+    ?? new HttpResilienceOptions();
+
+builder.Services.AddHttpClient<IUsersServiceClient, UsersServiceClient>()
+    .ConfigureHttpClient((sp, client) =>
+    {
+        var options = sp.GetRequiredService<IOptions<UsersServiceOptions>>().Value;
+        client.BaseAddress = new Uri(options.BaseUrl);
+        client.Timeout = Timeout.InfiniteTimeSpan;
+    })
+    .AddStandardResilienceHandler(options =>
+    {
+        options.Retry.MaxRetryAttempts = usersServiceResilience.MaxRetryAttempts;
+        options.AttemptTimeout.Timeout = TimeSpan.FromSeconds(usersServiceResilience.AttemptTimeoutSeconds);
+        options.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(usersServiceResilience.TotalRequestTimeoutSeconds);
+    });
 
 builder.Services.AddMassTransit(x =>
 {

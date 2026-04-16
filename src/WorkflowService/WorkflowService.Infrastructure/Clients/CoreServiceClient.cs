@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using WorkflowService.Application.Exceptions;
 using WorkflowService.Application.Interfaces;
 
 namespace WorkflowService.Infrastructure.Clients;
@@ -22,49 +23,121 @@ public class CoreServiceClient : ICoreServiceClient
         string? description,
         CancellationToken cancellationToken = default)
     {
-        var payload = new { ownerUserId, title, description };
-        using var response = await _httpClient.PostAsJsonAsync("/habits", payload, cancellationToken);
-
-        if (!response.IsSuccessStatusCode)
+        try
         {
-            var message = await TryReadMessageAsync(response, cancellationToken)
-                          ?? $"Core service returned {(int)response.StatusCode} while creating habit.";
-            throw new InvalidOperationException(message);
+            var payload = new { ownerUserId, title, description };
+            using var response = await _httpClient.PostAsJsonAsync("/habits", payload, cancellationToken);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var message = await TryReadMessageAsync(response, cancellationToken);
+                ThrowForFailedResponse("Core service", response.StatusCode, message);
+            }
+
+            var body = await response.Content.ReadFromJsonAsync<CreateHabitResponseDto>(JsonOptions, cancellationToken);
+            if (body?.HabitId is null || body.HabitId == Guid.Empty)
+                throw new InvalidOperationException("Core service returned an unexpected create habit response.");
+
+            return body.HabitId.Value;
         }
-
-        var body = await response.Content.ReadFromJsonAsync<CreateHabitResponseDto>(JsonOptions, cancellationToken);
-        if (body?.HabitId is null || body.HabitId == Guid.Empty)
-            throw new InvalidOperationException("Core service returned an unexpected create habit response.");
-
-        return body.HabitId.Value;
+        catch (ServiceUnavailableException)
+        {
+            throw;
+        }
+        catch (DependencyTimeoutException)
+        {
+            throw;
+        }
+        catch (HttpRequestException)
+        {
+            throw new ServiceUnavailableException("Core service is unavailable.");
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            throw new DependencyTimeoutException("Core service request timed out.");
+        }
     }
 
     public async Task UpdateHabitStatusAsync(Guid habitId, string status, CancellationToken cancellationToken = default)
     {
-        var payload = new { status };
-        using var response = await _httpClient.PatchAsJsonAsync($"/habits/{habitId}/status", payload, cancellationToken);
-
-        if (!response.IsSuccessStatusCode)
+        try
         {
-            var message = await TryReadMessageAsync(response, cancellationToken)
-                          ?? $"Core service returned {(int)response.StatusCode} while updating habit status.";
-            throw new InvalidOperationException(message);
+            var payload = new { status };
+            using var response = await _httpClient.PatchAsJsonAsync($"/habits/{habitId}/status", payload, cancellationToken);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var message = await TryReadMessageAsync(response, cancellationToken);
+                ThrowForFailedResponse("Core service", response.StatusCode, message);
+            }
+        }
+        catch (ServiceUnavailableException)
+        {
+            throw;
+        }
+        catch (DependencyTimeoutException)
+        {
+            throw;
+        }
+        catch (HttpRequestException)
+        {
+            throw new ServiceUnavailableException("Core service is unavailable.");
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            throw new DependencyTimeoutException("Core service request timed out.");
         }
     }
 
     public async Task DeleteHabitAsync(Guid habitId, CancellationToken cancellationToken = default)
     {
-        using var response = await _httpClient.DeleteAsync($"/habits/{habitId}", cancellationToken);
-
-        if (response.StatusCode == HttpStatusCode.NotFound)
-            return;
-
-        if (!response.IsSuccessStatusCode)
+        try
         {
-            var message = await TryReadMessageAsync(response, cancellationToken)
-                          ?? $"Core service returned {(int)response.StatusCode} while deleting habit.";
-            throw new InvalidOperationException(message);
+            using var response = await _httpClient.DeleteAsync($"/habits/{habitId}", cancellationToken);
+
+            if (response.StatusCode == HttpStatusCode.NotFound)
+                return;
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var message = await TryReadMessageAsync(response, cancellationToken);
+                ThrowForFailedResponse("Core service", response.StatusCode, message);
+            }
         }
+        catch (ServiceUnavailableException)
+        {
+            throw;
+        }
+        catch (DependencyTimeoutException)
+        {
+            throw;
+        }
+        catch (HttpRequestException)
+        {
+            throw new ServiceUnavailableException("Core service is unavailable.");
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            throw new DependencyTimeoutException("Core service request timed out.");
+        }
+    }
+
+    private static void ThrowForFailedResponse(string dependencyName, HttpStatusCode statusCode, string? detail)
+    {
+        if (statusCode is HttpStatusCode.GatewayTimeout or HttpStatusCode.RequestTimeout)
+            throw new DependencyTimeoutException(
+                string.IsNullOrWhiteSpace(detail)
+                    ? $"{dependencyName} returned {(int)statusCode}."
+                    : $"{dependencyName} returned {(int)statusCode}: {detail}");
+
+        if ((int)statusCode >= 500 || statusCode == HttpStatusCode.BadGateway)
+            throw new ServiceUnavailableException(
+                string.IsNullOrWhiteSpace(detail)
+                    ? $"{dependencyName} returned {(int)statusCode}."
+                    : $"{dependencyName} returned {(int)statusCode}: {detail}");
+
+        throw new InvalidOperationException(
+            detail ?? $"{dependencyName} returned {(int)statusCode}.");
     }
 
     private static async Task<string?> TryReadMessageAsync(HttpResponseMessage response, CancellationToken cancellationToken)

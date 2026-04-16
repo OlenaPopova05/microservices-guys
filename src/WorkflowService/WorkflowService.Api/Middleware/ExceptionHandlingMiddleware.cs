@@ -29,6 +29,14 @@ public class ExceptionHandlingMiddleware
         {
             await WriteJsonAsync(context, HttpStatusCode.NotFound, "not_found", ex.Message);
         }
+        catch (ServiceUnavailableException ex)
+        {
+            await WriteJsonAsync(context, HttpStatusCode.ServiceUnavailable, "service_unavailable", ex.Message);
+        }
+        catch (DependencyTimeoutException ex)
+        {
+            await WriteJsonAsync(context, HttpStatusCode.GatewayTimeout, "dependency_timeout", ex.Message);
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Unhandled exception. TraceId: {TraceId}", context.TraceIdentifier);
