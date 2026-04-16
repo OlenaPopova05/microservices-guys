@@ -28,4 +28,15 @@ public class HabitRepository : IHabitRepository
     {
         return _context.SaveChangesAsync();
     }
+
+    public async Task<bool> DeleteAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        var habit = await _context.Habits.FindAsync([id], cancellationToken);
+        if (habit is null)
+            return false;
+
+        _context.Habits.Remove(habit);
+        await _context.SaveChangesAsync(cancellationToken);
+        return true;
+    }
 }

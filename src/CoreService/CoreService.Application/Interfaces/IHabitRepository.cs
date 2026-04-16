@@ -7,4 +7,5 @@ public interface IHabitRepository
     Task<Habit> CreateAsync(Habit habit);
     Task<Habit?> GetByIdAsync(Guid id);
     Task SaveChangesAsync();
+    Task<bool> DeleteAsync(Guid id, CancellationToken cancellationToken = default);
 }

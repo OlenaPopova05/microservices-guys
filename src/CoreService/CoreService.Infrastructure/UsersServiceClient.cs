@@ -30,9 +30,9 @@ public class UsersServiceClient : IUsersServiceClient
         {
             throw new ServiceUnavailableException("Users service is unavailable.");
         }
-        catch (TaskCanceledException)
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
-            throw new ServiceUnavailableException("Users service is unavailable.");
+            throw new DependencyTimeoutException("Users service request timed out.");
         }
     }
 

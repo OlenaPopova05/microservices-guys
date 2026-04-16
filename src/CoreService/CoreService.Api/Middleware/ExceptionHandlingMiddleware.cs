@@ -68,6 +68,21 @@ public class ExceptionHandlingMiddleware
             var json = JsonSerializer.Serialize(response);
             await context.Response.WriteAsync(json);
         }
+        catch (DependencyTimeoutException ex)
+        {
+            context.Response.ContentType = "application/json";
+            context.Response.StatusCode = (int)HttpStatusCode.GatewayTimeout;
+
+            var response = new
+            {
+                error = "dependency_timeout",
+                message = ex.Message,
+                traceId = context.TraceIdentifier
+            };
+
+            var json = JsonSerializer.Serialize(response);
+            await context.Response.WriteAsync(json);
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Unhandled exception occurred. TraceId: {TraceId}", context.TraceIdentifier);
