@@ -1,4 +1,5 @@
 using MassTransit;
+using NotificationService.Api.Middleware;
 using Microsoft.EntityFrameworkCore;
 using NotificationService.Api;
 using NotificationService.Infrastructure;
@@ -43,5 +44,6 @@ using (var scope = app.Services.CreateScope())
 }
 
 app.MapGet("/health", () => Results.Ok("Healthy"));
+app.UseMiddleware<CorrelationIdMiddleware>();
 
 app.Run();
