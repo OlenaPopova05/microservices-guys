@@ -77,6 +77,18 @@ public class StartWorkflowHandler
             await _workflowRepository.SaveChangesAsync(cancellationToken);
             throw;
         }
+        catch (ServiceUnavailableException ex)
+        {
+            instance.SetState(WorkflowState.Failed, ex.Message);
+            await _workflowRepository.SaveChangesAsync(cancellationToken);
+            throw;
+        }
+        catch (DependencyTimeoutException ex)
+        {
+            instance.SetState(WorkflowState.Failed, ex.Message);
+            await _workflowRepository.SaveChangesAsync(cancellationToken);
+            throw;
+        }
         catch (Exception ex) when (habitId is not null)
         {
             await CompensateAsync(instance, habitId.Value, ex, cancellationToken);
